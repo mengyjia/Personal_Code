@@ -1,0 +1,137 @@
+#####part1
+#1
+library(freqparcoord)
+data(mlb)
+
+# Linear Model
+xvalpart <- function(data, p){
+  n <- nrow(mlb)
+  ntrain <- round(p*n)
+  trainidxs <- sample(1:n, ntrain, replace=FALSE)
+  list(train=data[trainidxs ,],valid=data[-trainidxs,])
+}
+
+xvallm <- function(data, ycol, predvars, p, meanabs=TRUE){
+  tmp <- xvalpart(data,p)
+  train <- tmp$train
+  valid <- tmp$valid
+  trainy <- train[, ycol]
+  trainpreds <- train[, predvars]
+  trainpreds <- as.matrix(trainpreds)
+  lmout <- lm(trainy ~ trainpreds)
+  validpreds <- as.matrix(valid[, predvars])
+  predy <- cbind(1, validpreds) %*% coef(lmout)
+  realy <- valid[, ycol]
+  if (meanabs) return(mean(abs(predy - realy)))
+  list(predy = predy, realy = realy)
+}
+
+lm_result <- round(xvallm(mlb, 5, c(4,6), 4/5),3)
+
+# KNN Model
+xvalknn <- function(data,ycol ,predvars ,k,p,meanabs=TRUE){
+  # cull out just Y and the Xs
+  data <- data[, c(predvars, ycol)] 
+  ycol <- length(predvars) + 1
+  tmp <- xvalpart(data,p)
+  train <- tmp$train
+  valid <- tmp$valid
+  valid <- as.matrix(valid)
+  xd <- preprocessx(train[,-ycol],k)
+  kout <- knnest(train[,ycol],xd,k)
+  predy <- predict(kout, valid[, -ycol], TRUE)
+  realy <- valid[, ycol]
+  if (meanabs) return(mean(abs(predy - realy)))
+  list (predy = predy , realy = realy)
+}
+
+library(regtools)
+knn_result <- round(xvalknn(mlb, 5, c(4,6), 5, 4/5),3)
+
+print(paste("Linear model result:", lm_result))
+print(paste("KNN model result:", knn_result))
+
+#2
+data(prgeng)
+
+prgeng$age2 <- prgeng$age^2
+edu <- prgeng$educ
+prgeng$ms <- as.integer(edu == 14)
+prgeng$phd <- as.integer(edu == 16)
+prgeng$fem <- prgeng$sex-1
+tmp <- prgeng[edu >= 13,]
+pe <- tmp[,c(1,12,9,13,14,15,8)]
+# interaction terms
+pe$agefem <- pe$age * pe$fem
+pe$age2fem <- pe$age2 * pe$fem
+# model
+model = lm(wageinc ~ age + age2 + wkswrkd + ms + phd + fem + agefem + age2fem, data = pe)
+summary(model)
+# Predict income for a 32-year-old female with a Master's degree
+age <- 32
+age2 <- 32^2
+wkswrkd <- 52
+ms <- 1
+phd <- 0
+fem <- 1
+agefem <- age*fem
+age2fem <- age2*fem
+input <- data.frame(age,age2,wkswrkd,ms,phd,fem,agefem,age2fem)
+predict(model, input, interval = "prediction", level = 0.95)
+
+#3
+data(bodyfat)
+model_density = lm(density ~ age + weight + height + neck + chest + abdomen + hip + thigh + knee + ankle + biceps + forearm + wrist, data = bodyfat)
+summary(model_density)
+# Indirect methods can be applied in this case because some of variables are not significant.
+# For examples: interaction terms
+
+#4
+# Overall mean height of all people is a weighted average of male mean height and female mean height.
+# Overall proportion of people taller than 70 inches is a weighted proportion of male taller than 70 inches and female taller than 70 inches.
+
+#####part2
+#1
+install.packages("confint")
+library(freqparcoord)
+data(prgeng)
+prgeng$age2 <- prgeng$age ^2
+edu <- prgeng$educ
+prgeng$ms <- as.integer(edu == 14)
+prgeng$phd <- as.integer( edu == 16)
+prgeng$fem <- prgeng$sex - 1
+prgeng$fem <- prgeng$sex - 1
+tmp <- prgeng[edu >= 13,]
+pe <- tmp[,c( 1 , 12 , 9 , 13 , 14 , 15 , 8 ) ]
+pe <- as.matrix ( pe )
+prgeng$msfem <- prgeng$ms * prgeng$fem
+prgeng$phdfem <- prgeng$phd * prgeng$fem
+model <- lm( wageinc ~ age+age2+wkswrkd+ms+phd+fem+msfem+phdfem , data=prgeng )
+summary(model)
+summary(model)$coefficients
+
+##(a)
+t_value <- qt(0.975, nrow(prgeng)-1)
+CI_lower <- coefficients(model)[7] - t_value*summary(model)$coefficients[7,2] 
+CI_upper <- coefficients(model)[7] + t_value*summary(model)$coefficients[7,2] 
+CI_lower
+CI_upper
+
+##(b)
+stderr_diff <- sqrt(summary(model)$coefficients[7,2]^2+summary(model)$coefficients[8,2]^2)
+mean_diff <- coefficients(model)[7] + coefficients(model)[8]
+CI_lower <- mean_diff-t_value*stderr_diff
+CI_upper <- mean_diff+t_value*stderr_diff
+CI_lower
+CI_upper
+
+#2
+day <- read.csv('day.csv')
+day$temp2 <- day$temp^2
+day$clearday <- as.integer(day$weathersit == 1)
+bike <- lm(registered ~ temp + temp2 + workingday + clearday + yr, data = day)
+bike_summ <- summary(bike)
+t_value <- qt(0.975, nrow(day)-5-1)
+yr_l <- coefficients(bike_summ)[6] - t_value * summary(bike_summ)$coefficients[6,2]
+yr_h <- coefficients(bike_summ)[6] + t_value * summary(bike_summ)$coefficients[6,2]
+paste0("Question2: 95% confidence interval: (",yr_l,', ', yr_h,')')
