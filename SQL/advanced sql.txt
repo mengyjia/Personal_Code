@@ -1,0 +1,75 @@
+Bigquery public data: https://cloud.google.com/bigquery/public-data/bay-bike-share (Links to an external site.)Links to an external site.
+
+1.Using bikeshare_status table, create a new dataset bikeshare_inventory_snapshot  with following fields:
+station_id
+station_name
+date
+bop_bikes_avail (beginning of the date # of bikes available)
+eop_bikes_avail (end of the date # of bikes available)
+
+2.Using bikeshare_trips table, create a new dataset bikeshare_trip_transaction  with following fields:
+station_id
+station_name
+date
+txn_count
+One row of source table will create two records in this datasets
+
+For start_stations, txn_count = 1, end_stations, txn_count = -1
+
+Using Bikeshare_inventory_snapshot and bikeshare_trip_transaction , validate following assumption that:
+
+BOD_inventory + (txn_count) = EOD_inventory
+
+
+
+
+
+Q1
+
+select distinct t3.station_id,t5.name station_name,t3.date,t3.eop_bikes_avail,t4.bop_bikes_avail
+from(
+select station_id, bikes_available eop_bikes_avail,date( time) date 
+from `bigquery-public-data.san_francisco.bikeshare_status` t1
+where 
+t1.time in 
+(select max(t2.time) from `bigquery-public-data.san_francisco.bikeshare_status` t2 
+group by date(t2.time))) t3
+join
+(select station_id, bikes_available bop_bikes_avail,date( time) date 
+from `bigquery-public-data.san_francisco.bikeshare_status` t1
+where 
+t1.time in 
+(select min(t2.time) from `bigquery-public-data.san_francisco.bikeshare_status` t2 
+group by date(t2.time))) t4
+on t3.station_id = t4. station_id and t3.date = t4.date
+join 
+`bigquery-public-data.san_francisco.bikeshare_stations` t5
+on 
+t3.station_id = t5.station_id
+
+
+Q2 
+select t1.date, t1. station_id, t2.increase_bike - t1.loss_bike txn_count
+from
+(select date( start_date ) date, start_station_id station_id, 
+count( start_station_id) loss_bike
+from `bigquery-public-data.san_francisco.bikeshare_trips`
+group by date, start_station_id) t1
+join
+(select date( end_date ) date, end_station_id station_id, 
+count( end_station_id) increase_bike
+from `bigquery-public-data.san_francisco.bikeshare_trips`
+group by date, end_station_id) t2
+on
+t1.date = t2.date and t1.station_id = t2.station_id
+ORDER BY 
+txn_count desc
+
+Q3
+
+select * from
+(select t1.station_id, t1.date, (t1.eop_bikes_avail - t1.bop_bikes_avail - t2.txn_count) as check
+from `hhh.bikeshare_inventory_snapshot` t1
+join `hhh.bikeshare_trip_transaction` t2
+on t1.station_id = t2.station_id and t1.date = t2.date)
+where check <> 0

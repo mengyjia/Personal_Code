@@ -1,0 +1,184 @@
+
+#1: Create an ETL script that captures new batch file. Please use delete “all matched”, then append “all” new batch method.
+
+Note: All matched = All matched changed + All matched not changed.
+
+ 
+
+Write query to find all matched (28 records) -- this only used to verify matched counts
+Write query to delete all matched (correct example slide #15)
+28 rows affected
+
+Write query to load new batch (Note: Dest table: Customer, and Append table)
+ 
+
+#2: How to check if new batch file has been updated in customer table
+
+ 
+
+Recreate customer table from backup.
+
+#3 Create an ETL script that captures new batch file. Please use update “all (matched) changed”, then append only new records in the new batch method.
+
+Write query to find all matched changed (8 records) -- this only used to verify all matched changed counts
+Write query to update all matched changed.
+8 rows affected. 
+ 
+
+#4 using Union Distinct and Union All
+
+Recreate customer table from backup.
+
+
+
+#5.
+
+Upload dim_date_input csv into BQ. And use it as starting point, write SQL script to populate dim_date_2017 dimension table. 
+(csv example attached for you to check your script result.) 
+Use date, datetime, time, timestamp and string functions. 
+Use dim_date_2017.csv as sample file and refer dim_date_data_dictionary for data type.
+
+
+
+Q1
+
+delete from `assignment4.customer` where Cust_ID in (select t1.Cust_ID from `assignment4.customer` t1
+join 
+`assignment4.customer_vhw` t2
+on
+t1.Cust_ID = t2.Cust_ID)
+
+
+insert into `assignment4.customer`( Cust_ID, EMAIL, FIRST_NAME, LAST_NAME, AFFILIATION, Registration_Date, Deactivation_Date, birth_year, gender )
+select * from `assignment4.customer_vhw`
+
+Q2
+
+select count(*)
+
+from (
+
+select * from `assignment4.customer` 
+
+UNION DISTINCT
+
+select * from `assignment4.customer_vhw` )
+
+
+
+Q3
+
+update
+`assignment4.customer_recreate_1` t1
+set
+t1. gender = t3.gender,
+t1. Deactivation_Date = t3. Deactivation_Date
+from
+(select t1.* from `assignment4.customer_recreate_1` t1
+join 
+`assignment4.customer_vhw` t2
+on
+t1.Cust_ID = t2.Cust_ID
+WHERE
+t1.gender <> t2.gender
+or ifnull(t1. Deactivation_Date , "3010-10-20") <> IFNULL(t2. Deactivation_Date, "3010-10-20")) t3
+where 
+t1. Cust_ID = t3.Cust_ID
+
+insert into
+`assignment4.customer_recreate_1` 
+( Cust_ID, EMAIL, FIRST_NAME, LAST_NAME, AFFILIATION, Registration_Date, Deactivation_Date, birth_year, gender )
+select * from 
+`assignment4.customer_vhw` t3
+where
+t3. Cust_ID not in (
+select t1.Cust_ID from `assignment4.customer_recreate_1` t1
+join 
+`assignment4.customer_vhw` t2
+on
+t1.Cust_ID = t2.Cust_ID)
+
+other method for update:
+
+update
+`assignment4.customer_recreate_1`
+set
+`assignment4.customer_recreate_1`. gender = t2.gender,
+`assignment4.customer_recreate_1`. Deactivation_Date = t2. Deactivation_Date
+from
+`assignment4.customer_recreate_1` t1
+join 
+`assignment4.customer_vhw` t2
+on
+t1.Cust_ID = t2.Cust_ID
+WHERE
+t1.gender <> t2.gender
+or ifnull(t1. Deactivation_Date , "3010-10-20") <> IFNULL(t2. Deactivation_Date, "3010-10-20")
+
+
+Q5
+
+
+select date,
+case extract(dayofweek from date)
+when 1
+then "Sunday"
+when 2
+then "Monday"
+when 3
+then "Tuesday"
+when 4
+then "Wednesday"
+when 5
+then "Thursday"
+when 6
+then "Friday"
+else "Saturday"
+end day,
+extract(year from date) year,
+extract(month from date) month,
+date(extract(year from date),12,31) yearEndDate, 
+date_trunc(date,year) yearStartDate,
+date_trunc(date,week) weekStartDate,
+date_add(date_trunc(date,week),interval 6 day) weekEndDate,
+date_trunc(date,quarter) quarterStartDate,
+date_sub(date_add(date_trunc(date,quarter),interval 1 quarter),interval 1 day) quarterEndDate,
+date_trunc(date,month) monthStartDate,
+date_sub(date_add(date_trunc(date,month),interval 1 month),interval 1 day) monthEndDate,
+date_sub(date_trunc(date,quarter),interval 1 quarter) lastQtrStartDate,
+date_sub(date_trunc(date,quarter),interval 1 day) lastQtrEndDate,
+date_sub(date_trunc(date,month),interval 1 month) lastMonthStartDate,
+date_sub(date_trunc(date,month),interval 1 day) lastMonthEndDate,
+date_sub(date,interval 90 day) last90DaysAgo,
+date_sub(date,interval 30 day) last30DaysAgo,
+date_sub(date,interval 120 day) last120DaysAgo,
+date_sub(date_trunc(date,year),interval 1 year) LYYearStartDate,
+date_sub(date_trunc(date,year),interval 1 day) LYYearEndDate,
+date_sub(date,interval 1 year) LYSameDate,
+date_trunc(date_sub(date,interval 1 year),quarter) LYQtrStartDate,
+date_sub(date_add(date_trunc(date_sub(date,interval 1 year),quarter),interval 1 quarter),interval 1 day) LYQtrEndDate,
+date_trunc(date_sub(date,interval 1 year),month) LYMonthStartDate,
+date_sub(date_add(date_trunc(date_sub(date,interval 1 year),month),interval 1 month),interval 1 day) LYMonthEndDate,
+case extract(dayofweek from date)
+when 1
+then date_sub(date, interval 6 day)
+when 2
+then date
+else
+date_add(date_trunc(date,week),interval 1 day)
+end MonWeekStartDate,
+case extract(dayofweek from date)
+when 1
+then date
+when 2
+then 
+date_add(date, interval 6 day)
+else
+date_add(date_trunc(date,week),interval 7 day)
+end SunWeekEndDate
+from `assignment4.dim_date_input` 
+
+
+
+
+
